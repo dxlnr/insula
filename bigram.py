@@ -88,13 +88,13 @@ def nll(words: List[str], n_bigram: torch.Tensor, lt: Dict[str, int]):
     return -log_l / n
 
 
-def train(xs, ys, w, lr: float = 0.1):
+def train(xs, ys, w, lr: float = 0.1, reg_w: float = 0.01):
     """Performing optimization."""
-    for i in range(50):
+    for _ in range(50):
         # Forward pass.
         logits = torch.matmul(xs, w)
         p = softmax(logits)
-        loss = -p[torch.arange(len(xs)), ys].log().mean()
+        loss = -p[torch.arange(len(xs)), ys].log().mean() + reg_w * (w**2).mean()
         print(f'loss: {loss.item():.3f}')
 
         # Backward pass.
