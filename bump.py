@@ -1,7 +1,6 @@
 """Various Language Models."""
 from typing import List 
-import numpy as np
-np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
+import torch
 
 
 def def_lookup_table(words: List[str]):
@@ -14,7 +13,7 @@ def def_lookup_table(words: List[str]):
 def bigram(words: List[str]):
     """Returns the Bigram of a list of str."""
     clt = def_lookup_table(words)
-    bigram = np.zeros([len(clt), len(clt)], dtype=np.uint32)
+    bigram = torch.zeros([len(clt), len(clt)], dtype=torch.int32)
 
     for w in words:
         aw = ['.'] + list(w) + ['.']
@@ -22,6 +21,13 @@ def bigram(words: List[str]):
             bigram[clt[c1]][clt[c2]] += 1
 
     return bigram
+
+
+def norm_bigram(bigram):
+    """Normalize the tensor along each row."""
+    bigram.float()
+    return bigram / bigram.sum(1, keepdim=True)
+
 
 def vis_bigram(bigram, words):
     """Visualize Bigram via 2D plot."""
@@ -46,4 +52,7 @@ if __name__ == "__main__":
         # Compute the Bigram.
         bgr = bigram(words)
         # Visualize bigram matrix. 
-        vis_bigram(bgr, words)
+        # vis_bigram(bgr, words)
+
+        bgr.float()
+        bgr = bgr / bgr.sum()
