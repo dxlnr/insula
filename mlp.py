@@ -3,8 +3,9 @@ import torch
 import torch.nn.functional as F
 
 # Hyperparameters
-EMBEDDING_SPACE = 2
+EMBEDDING_SPACE = 10
 BLOCK_SIZE = 3
+BATCH_SIZE = 16
 
 
 def def_lookup_table(words: list[str]):
@@ -17,16 +18,12 @@ def def_lookup_table(words: list[str]):
 def get_dataset(words: list[str], lt: dict[str, int], block_size: int = 3):
     x, y = [], [] 
     for w in words:
-        for idx, ch in enumerate(w):
-            if idx == 0:
-                x.append([0, lt[ch], lt[w[idx+1]]])
-                y.append(lt[w[idx+1]])
-            elif idx == len(w) - 1:
-                x.append([lt[w[idx-1]], lt[ch], 0])
-                y.append(0)
-            else:
-                x.append([lt[w[idx-1]], lt[ch], lt[w[idx+1]]])
-                y.append(lt[w[idx+1]])
+
+        context = [0] * BLOCK_SIZE
+        for i, ch in enumerate(w + '.'):
+            x.append(context)
+            y.append(lt[ch])
+            context = context[1:] + [lt[ch]]
 
     return torch.Tensor(x), torch.Tensor(y) 
 
@@ -43,6 +40,27 @@ def build_model(hidden_layers: int = 100):
     return [c, w1, b1, w2, b2]
 
 
+def generate_sequence(params, n: int=5):
+    for _ in range(n):
+        out = []
+        context = [0] * BLOCK_SIZE
+
+        while True:
+            emb = params[0][torch.tensor([context])]
+            h = torch.tanh(emb.view(-1, BLOCK_SIZE*EMBEDDING_SPACE) @ params[1] + params[2])
+            logits = h @ params[3] + params[4]
+            probs = F.softmax(logits, dim=1)
+
+            ix = torch.multinomial(probs, num_samples=1).item()
+            context = context[1:] + [ix]
+            out.append(ix)
+
+            if ix == 0:
+                break
+           
+        print(''.join(list(lt.keys())[list(lt.values()).index(i)] for i in out))
+
+
 if __name__ == "__main__":
     global lt, words
 
@@ -54,18 +72,22 @@ if __name__ == "__main__":
         x, labels = get_dataset(words, lt)
         x = x.long()
         labels = labels.long()
+
         params = build_model()
 
         for p in params:
             p.requires_grad = True
         
-        for i in range(250):
+        lr = 0.1
+        for i in range(100000):
+            b_idx = torch.randint(0, x.shape[0], (BATCH_SIZE, ))
+
             # forward pass
-            embeddings = params[0][x]
+            embeddings = params[0][x[b_idx]]
             h = torch.tanh(embeddings.view(-1, BLOCK_SIZE*EMBEDDING_SPACE) @ params[1] + params[2])
             logits = h @ params[3] + params[4]
             
-            loss = F.cross_entropy(logits, labels)
+            loss = F.cross_entropy(logits, labels[b_idx])
             
             # backward pass
             for p in params:
@@ -74,8 +96,15 @@ if __name__ == "__main__":
 
             # update
             for p in params:
-                p.data += -0.1 * p.grad
+                p.data += -lr * p.grad
             
-            if i % 50 == 0:
+            if i % 10000 == 0:
                 print(loss.item())
-        print(loss.item())
+
+            if i > 25000:
+                lr = 0.01
+
+        print("")
+        print("final loss : ", loss.item())
+        print("") 
+        generate_sequence(params)
