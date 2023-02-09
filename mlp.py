@@ -3,9 +3,9 @@ import torch
 import torch.nn.functional as F
 
 # Hyperparameters
-EMBEDDING_SPACE = 10
+EMBEDDING_SPACE = 12
 BLOCK_SIZE = 3
-HIDDEN_LAYERS = 1000
+HIDDEN_LAYERS = 500
 BATCH_SIZE = 32
 
 
@@ -62,9 +62,9 @@ def generate_sequence(params, n: int = 5):
                 emb.view(-1, BLOCK_SIZE * EMBEDDING_SPACE) @ params[0][1] 
             )
 
-            h = params[0][2] * (hp - params[1][0]) / bnstd_i + params[1][1]
+            hp = params[0][2] * (hp - params[1][0]) / (params[0][3] + params[1][1])
 
-            logits = h @ params[0][4] + params[0][5]
+            logits = hp @ params[0][4] + params[0][5]
             probs = F.softmax(logits, dim=1)
 
             ix = torch.multinomial(probs, num_samples=1).item()
@@ -94,8 +94,7 @@ if __name__ == "__main__":
         for p in params[0]:
             p.requires_grad = True
 
-        lr = 0.1
-        for i in range(200000):
+        for i in range(120000):
             b_idx = torch.randint(0, x.shape[0], (BATCH_SIZE,))
 
             # forward pass
@@ -120,7 +119,8 @@ if __name__ == "__main__":
             for p in params[0]:
                 p.grad = None
             loss.backward()
-
+            
+            lr = 0.1 if i < 10000 else 0.01
             # update
             for p in params[0]:
                 p.data += -lr * p.grad
@@ -128,12 +128,8 @@ if __name__ == "__main__":
             if i % 10000 == 0:
                 print(f"{loss.item():.4f}")
 
-            if i > 10000:
-                lr = 0.01
-            if i > 50000:
-                lr = 0.001
-
         print("")
         print("final loss : ", loss.item())
         print("")
+        print("Results: ")
         generate_sequence(params)
