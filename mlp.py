@@ -45,7 +45,7 @@ def build_model():
 
     w2 = torch.randn((HIDDEN_LAYERS, len(lt))) * 0.01
     b2 = torch.randn(len(lt)) * 0.0
-    
+
     # Return Model with [trainable params] & [non-trainable params] in terms of
     # the gradient.
     return [[c, w1, bngain, bnbias, w2, b2], [bn_mean, bn_std]]
@@ -58,9 +58,7 @@ def generate_sequence(params, n: int = 5):
 
         while True:
             emb = params[0][0][torch.tensor([context])]
-            hp = torch.tanh(
-                emb.view(-1, BLOCK_SIZE * EMBEDDING_SPACE) @ params[0][1] 
-            )
+            hp = torch.tanh(emb.view(-1, BLOCK_SIZE * EMBEDDING_SPACE) @ params[0][1])
 
             hp = params[0][2] * (hp - params[1][0]) / (params[0][3] + params[1][1])
 
@@ -110,7 +108,7 @@ if __name__ == "__main__":
             with torch.no_grad():
                 params[1][0] = 0.999 * params[1][0] + 0.001 * bnmean_i
                 params[1][1] = 0.999 * params[1][1] + 0.001 * bnstd_i
-            
+
             logits = hp @ params[0][4] + params[0][5]
 
             loss = F.cross_entropy(logits, labels[b_idx])
@@ -119,7 +117,7 @@ if __name__ == "__main__":
             for p in params[0]:
                 p.grad = None
             loss.backward()
-            
+
             lr = 0.1 if i < 10000 else 0.01
             # update
             for p in params[0]:

@@ -95,12 +95,12 @@ def train(xs, ys, w, lr: float = 0.1, reg_w: float = 0.01):
         logits = torch.matmul(xs, w)
         p = softmax(logits)
         loss = -p[torch.arange(len(xs)), ys].log().mean() + reg_w * (w**2).mean()
-        print(f'loss: {loss.item():.3f}')
+        print(f"loss: {loss.item():.3f}")
 
         # Backward pass.
         w.grad = None
         loss.backward()
-        
+
         # update
         w.data += -lr * w.grad
 
@@ -144,6 +144,6 @@ if __name__ == "__main__":
         xs, ys = create_dataset(words, lt)
         # Input weights.
         w = torch.randn((len(lt), len(lt)), requires_grad=True)
-        
+
         # Perform training.
         train(xs, ys, w, lr=50)

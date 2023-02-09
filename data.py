@@ -14,6 +14,4 @@ def create_dataset(words, lt):
 
     xs, ys = torch.tensor(xs), torch.tensor(ys)
 
-    return (
-        torch.nn.functional.one_hot(xs, len(lt)).float(), ys
-    )
+    return (torch.nn.functional.one_hot(xs, len(lt)).float(), ys)
