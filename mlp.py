@@ -1,4 +1,6 @@
 """Multi-Layer-Perceptron"""
+import random
+
 import torch
 import torch.nn.functional as F
 
@@ -29,6 +31,19 @@ def get_dataset(words: list[str], lt: dict[str, int], block_size: int = 3):
     return torch.Tensor(x), torch.Tensor(y)
 
 
+def split_dataset(words):
+    random.seed(42)
+    random.shuffle(words)
+    n1 = int(0.8 * len(words))
+    n2 = int(0.9 * len(words))
+
+    xtr, ytr = get_dataset(words[:n1])  # 80%
+    xval, yval = get_dataset(words[n1:n2])  # 10%
+    xte, yte = get_dataset(words[n2:])  # 10%
+
+    return xtr, ytr, xval, yval, xte, yte
+
+
 def build_model():
     c = torch.randn((len(lt), EMBEDDING_SPACE))
 
@@ -50,6 +65,89 @@ def build_model():
     # the gradient.
     return [[c, w1, bngain, bnbias, w2, b2], [bn_mean, bn_std]]
 
+
+def forward(xb, yb, c, w1, b1, bngain, bnbias, w2, b2):
+    emb = c[xb]  # embed the characters into vectors
+    embcat = emb.view(emb.shape[0], -1)  # concatenate the vectors
+
+    # Linear layer 1
+    hprebn = embcat @ w1 + b1  # hidden layer pre-activation
+
+    # BatchNorm layer
+    bnmeani = 1 / n * hprebn.sum(0, keepdim=True)
+    bndiff = hprebn - bnmeani
+    bndiff2 = bndiff**2
+    bnvar = (
+        1 / (n - 1) * (bndiff2).sum(0, keepdim=True)
+    )  # note: Bessel's correction (dividing by n-1, not n)
+    bnvar_inv = (bnvar + 1e-5) ** -0.5
+    bnraw = bndiff * bnvar_inv
+    hpreact = bngain * bnraw + bnbias
+
+    # Non-linearity
+    h = torch.tanh(hpreact)  # hidden layer
+    # Linear layer 2
+    logits = h @ w2 + b2  # output layer
+
+    # cross entropy loss (same as F.cross_entropy(logits, Yb))
+    logit_maxes = logits.max(1, keepdim=True).values
+    norm_logits = logits - logit_maxes  # subtract max for numerical stability
+    counts = norm_logits.exp()
+    counts_sum = counts.sum(1, keepdims=True)
+    counts_sum_inv = counts_sum**-1
+    probs = counts * counts_sum_inv
+    logprobs = probs.log()
+    loss = -logprobs[range(n), yb].mean()
+
+    return loss
+
+
+def backward():
+    d_logprobs = torch.zeros_like(logprobs)
+    d_logprobs[range(n), yb] = -1.0/n
+
+    # cross-entropy-loss
+    d_probs = d_logprobs * (1 / probs)
+    d_counts_sum_inv = (d_probs * counts).sum(1, keepdim=True)
+    d_counts_sum = d_counts_sum_inv * (-counts_sum**-2)
+    d_counts = counts_sum_inv * d_probs
+    d_counts += d_counts_sum * torch.ones_like(counts) 
+    d_norm_logits = d_counts * norm_logits.exp()
+    d_logit_maxes = (-d_norm_logits).sum(1, keepdim=True)
+
+    # Linear layer 2
+    d_logits = d_norm_logits.clone()
+    d_logits += F.one_hot(logits.max(1).indices, num_classes=logits.shape[1]) * d_logit_maxes
+
+    # Non-Linearity
+    d_h = d_logits @ w2.T
+    d_W2 = h.T @ d_logits
+    d_b2 = d_logits.sum(0)
+
+    # BatchNorm layer
+    d_hpreact = d_h * (1 - torch.tanh(hpreact)**2)
+    d_bnraw = d_hpreact * bngain
+    d_bnvar_inv = (d_bnraw * bndiff).sum(0, keepdim=True)
+    d_bnvar = d_bnvar_inv * (-0.5 * (bnvar + 1e-5)**-1.5)
+    d_bndiff2 = d_bnvar * (1.0/(n-1))*torch.ones_like(bndiff2)
+    d_bndiff = d_bnraw * bnvar_inv
+    d_bndiff += 2*bndiff * d_bndiff2
+    d_bnmeani = (-d_bndiff).sum(0, keepdim=True)
+    d_hprebn = d_bndiff.clone()
+    d_hprebn += 1.0/n * (torch.ones_like(hprebn) * d_bnmeani)
+
+    # Linear Layer1
+    d_embcat = d_hprebn @ w1.T
+
+    d_w1 = embcat.T @ d_hprebn
+    d_emb = d_embcat.view(emb.shape)
+    d_c = torch.zeros_like(c)
+    for k in range(xb.shape[0]):
+      for j in range(xb.shape[1]):
+        ix = xb[k,j]
+        d_c[ix] += d_emb[k,j]
+
+    return d_c, d_w1, d_w2, d_b2
 
 def generate_sequence(params, n: int = 5):
     for _ in range(n):
