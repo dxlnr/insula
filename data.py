@@ -15,3 +15,10 @@ def create_dataset(words, lt):
     xs, ys = torch.tensor(xs), torch.tensor(ys)
 
     return (torch.nn.functional.one_hot(xs, len(lt)).float(), ys)
+
+
+def def_lookup_table(words: list[str]) -> dict:
+    """Returns a lookup table with all the chars in words plus special char
+    for start and ending."""
+    clist = ["."] + sorted(list(set("".join(words))))
+    return {s: i for i, s in enumerate(clist)}
