@@ -14,8 +14,8 @@ def create_dataset(words, lt):
 
     xs, ys = torch.tensor(xs), torch.tensor(ys)
 
-    return (torch.nn.functional.one_hot(xs, len(lt)).float(), ys)
-
+    # return (torch.nn.functional.one_hot(xs, len(lt)).float(), ys)
+    return xs, ys
 
 def def_lookup_table(words: list[str]) -> dict:
     """Returns a lookup table with all the chars in words plus special char
