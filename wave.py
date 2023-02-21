@@ -1,7 +1,8 @@
 """WaveNet"""
 import torch
+import torch.nn.functional as F
 
-from data import def_lookup_table, create_dataset
+from data import def_lookup_table, get_dataset
 from nn.layers import Embeddings, Flatten, Sequential, Linear, BatchNorm1D, Tanh
 
 
@@ -26,7 +27,8 @@ def build_model(vocab_size):
     )
 
     for p in model.params():
-        p.requires_grad = True
+        if p is not None:
+            p.requires_grad = True
 
     return model
 
@@ -39,13 +41,11 @@ if __name__ == "__main__":
         lt = def_lookup_table(words)
 
         # Construct the dataset.
-        x, y = create_dataset(words, lt)
+        x, y = get_dataset(words, lt)
         x = x.long()
         y = y.long()
 
-        print(x.shape)
         vocab_size = len(lt)
-        print(vocab_size)
         # Construct the model.
         model = build_model(vocab_size)
 

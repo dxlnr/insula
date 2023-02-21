@@ -1,27 +1,29 @@
 """Small Layers Library"""
 import torch
+import torch.nn.functional as F
 
 
 class Linear:
     def __init__(self, in_dim, out_dim, bias: bool = True):
         self.bias = bias
         self.w = torch.randn((in_dim, out_dim)) / (in_dim**0.5)
-        b = torch.zeros(out_dim) if bias else None
+        self.b = torch.zeros(out_dim) if bias else None
 
     def __call__(self, input):
         self.out = input @ self.w
-        if self.bias is not None:
+        if self.b is not None:
             self.out += self.b
         return self.out
 
     def params(self):
-        return [self.w] + ([] if self.bias is None else [self.bias])
+        return [self.w] + ([] if self.b is None else [self.b])
 
 
 class BatchNorm1D():
-    def __init__(self, size: int, eps: float = 1e-5, momentum: float = 0.1):
+    def __init__(self, size: int, eps: float = 1e-5, momentum: float = 0.1, train: bool = True):
         self.eps = eps
         self.momentum = momentum
+        self.train = train
         # trainable
         self.bngain = torch.ones((1, size))
         self.bnbias = torch.zeros((1, size))
@@ -67,6 +69,7 @@ class Embeddings():
 
     def __init__(self, num_embeddings, emb_dims):
         self.w = torch.randn((num_embeddings, emb_dims))
+        print("emb :", self.w.shape)
 
     def __call__(self, input_idx):
         self.out = self.w[input_idx]

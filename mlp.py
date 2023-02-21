@@ -192,7 +192,8 @@ if __name__ == "__main__":
 
         for i in range(120000):
             b_idx = torch.randint(0, x.shape[0], (BATCH_SIZE,))
-
+            
+            print("shape: ", x[b_idx].shape)
             # forward pass
             embeddings = params[0][0][x[b_idx]]
             hp = torch.tanh(
