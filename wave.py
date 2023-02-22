@@ -44,6 +44,27 @@ def inspect_model(model):
         print(layer.__class__.__name__, ":", tuple(layer.out.shape))
 
 
+def generate_sample(model, lt, n: int = 3, block_size: int = 8):
+    """Generate Sample from model."""
+    for _ in range(n):
+        out = []
+        context = [0] * block_size 
+        while True:
+          # forward pass the neural net
+          logits = model(torch.tensor([context]))
+          probs = F.softmax(logits, dim=1)
+          # sample from the distribution
+          ix = torch.multinomial(probs, num_samples=1).item()
+          # shift the context window and track the samples
+          context = context[1:] + [ix]
+          out.append(ix)
+          # if we sample the special '.' token, break
+          if ix == 0:
+            break
+        
+        print("".join(list(lt.keys())[list(lt.values()).index(i)] for i in out))
+
+
 if __name__ == "__main__":
     global lt, words
 
@@ -81,3 +102,9 @@ if __name__ == "__main__":
 
             if i % 10000 == 0:
                 print(f"{loss.item():.4f}")
+        
+        print("")
+        print("final loss : ", loss.item())
+        print("")
+        print("Results: ")
+        generate_sample(model, lt, 5)
