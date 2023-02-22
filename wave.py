@@ -3,23 +3,29 @@ import torch
 import torch.nn.functional as F
 
 from data import def_lookup_table, get_dataset
-from nn.layers import Embeddings, Flatten, Sequential, Linear, BatchNorm1D, Tanh
+from nn.layers import Embeddings, ConsFlatten, Sequential, Linear, BatchNorm1D, Tanh
 
 
 # Hyperparameters
-EMBEDDING_SPACE = 12
-BLOCK_SIZE = 3
+EMBEDDING_SPACE = 10
+BLOCK_SIZE = 8
+BLOCK_SPLIT = 2
 STEPS = 100000
 BATCH_SIZE = 32
 N_HIDDEN = 250
 
 
-def build_model(vocab_size):
+def build_model(vocab_size: int):
     model = Sequential(
         [
             Embeddings(vocab_size, EMBEDDING_SPACE),
-            Flatten(),
-            Linear(EMBEDDING_SPACE * BLOCK_SIZE, N_HIDDEN, bias=False),
+            ConsFlatten(BLOCK_SPLIT), Linear(EMBEDDING_SPACE * BLOCK_SPLIT, N_HIDDEN, bias=True), 
+            BatchNorm1D(N_HIDDEN),
+            Tanh(),
+            ConsFlatten(BLOCK_SPLIT), Linear(N_HIDDEN * BLOCK_SPLIT, N_HIDDEN, bias=True),
+            BatchNorm1D(N_HIDDEN),
+            Tanh(),
+            ConsFlatten(BLOCK_SPLIT), Linear(N_HIDDEN * BLOCK_SPLIT, N_HIDDEN, bias=True),
             BatchNorm1D(N_HIDDEN),
             Tanh(),
             Linear(N_HIDDEN, vocab_size),
@@ -29,8 +35,13 @@ def build_model(vocab_size):
     for p in model.params():
         if p is not None:
             p.requires_grad = True
-
+    
     return model
+
+
+def inspect_model(model):
+    for layer in model.layers:
+        print(layer.__class__.__name__, ":", tuple(layer.out.shape))
 
 
 if __name__ == "__main__":
@@ -41,7 +52,7 @@ if __name__ == "__main__":
         lt = def_lookup_table(words)
 
         # Construct the dataset.
-        x, y = get_dataset(words, lt)
+        x, y = get_dataset(words, lt, BLOCK_SIZE)
         x = x.long()
         y = y.long()
 
